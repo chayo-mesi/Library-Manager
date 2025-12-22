@@ -30,7 +30,7 @@ jobs:
 
       - name: Zip the app folder
         run: |
-          powershell Compress-Archive -Path dist\CozyLibManager\* -DestinationPath CozyLibManager-windows.zip
+          powershell "$d=Get-ChildItem dist -Directory | Select-Object -First 1; if (-not $d) { throw 'No dist subfolder found.' }; Compress-Archive -Path ($d.FullName + '\*') -DestinationPath CozyLibManager-windows.zip"
 
       - name: Create GitHub Release and upload zip
         uses: softprops/action-gh-release@v2
