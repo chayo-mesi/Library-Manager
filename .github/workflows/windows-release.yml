@@ -29,13 +29,13 @@ jobs:
           pyinstaller --noconfirm --clean CozyLibManager.spec
 
       - name: Zip the app folder
+        shell: pwsh
         run: |
-          powershell "
-          $d = Get-ChildItem dist -Directory | Select-Object -First 1;
-          if (-not $d) { throw 'No dist subfolder found.' };
-          Write-Host ('Zipping folder: ' + $d.FullName);
-          Compress-Archive -Force -Path ($d.FullName + '\*') -DestinationPath CozyLibManager-windows.zip
-          "
+          $d = Get-ChildItem -Path dist -Directory | Select-Object -First 1
+          if (-not $d) { throw "No dist subfolder found in dist/." }
+          Write-Host "Zipping folder: $($d.FullName)"
+          Compress-Archive -Force -Path (Join-Path $d.FullName '*') -DestinationPath CozyLibManager-windows.zip
+      
 
       - name: Create GitHub Release and upload zip
         uses: softprops/action-gh-release@v2
