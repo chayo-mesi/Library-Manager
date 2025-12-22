@@ -14,6 +14,9 @@ import threading
 import html
 import sys
 import os
+import platform
+import ctypes
+from ctypes import wintypes
 from library_data import LibraryData
 
 
@@ -110,8 +113,8 @@ SHARED_MINILABEL_BG_COLOR            = THEME_COLOR1
 SHARED_MINILABEL_TEXT_COLOR          = THEME_COLOR4
 
 # Primary Button (neutral)
-SHARED_BUTTON1_BG_COLOR              = THEME_COLOR00
-SHARED_BUTTON1_TEXT_COLOR            = THEME_COLOR5
+SHARED_BUTTON1_BG_COLOR              = THEME_COLOR3
+SHARED_BUTTON1_TEXT_COLOR            = THEME_COLOR1
 SHARED_BUTTON1_BG_ONCLICK_COLOR      = THEME_COLOR10
 SHARED_BUTTON1_TEXT_ONCLICK_COLOR    = THEME_COLOR1
 
@@ -618,7 +621,111 @@ MISSINGDATA_PLUSBTN_WIDTH            = 2
 SYNCLIB_BG_COLOR                     = THEME_COLOR1
 SYNCLIB_TEXT_COLOR                   = THEME_COLOR2
 
+def get_user_data_dir(app_name: str = "CozyLibraryManager") -> Path:
+    """
+    Returns a persistent per-user data directory.
+    Windows: %APPDATA%\\CozyLibraryManager
+    macOS: ~/Library/Application Support/CozyLibraryManager
+    Linux: ~/.local/share/CozyLibraryManager (or $XDG_DATA_HOME)
+    """
+    sysname = platform.system().lower()
+
+    if sysname == "windows":
+        base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+        path = Path(base) / app_name
+    elif sysname == "darwin":
+        path = Path.home() / "Library" / "Application Support" / app_name
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+        path = Path(base) / app_name
+
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
 class LibraryApp(tk.Tk):
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        # prevent initial "flash" before first page is fully rendered
+        self.withdraw()
+
+        # Load bundled fonts (Windows) + resolve primary->fallback font families
+        self._load_app_fonts()
+        self._resolve_font_fallbacks()
+
+        # Build Tk Font objects using the resolved families
+        self._init_fonts()
+
+        self.title(SHARED_WINDOW_TITLE)
+        self.minsize(900, 600)
+        self.geometry("1280x920")
+
+        self.active_widgets: list[tk.Widget] = []
+        self.placed_widgets: list[tuple[tk.Widget, int, int, str]] = []
+        self.canvas_text_items: list[tuple[int, float, float]] = []
+
+        # --- canvas ---
+        self.canvas = tk.Canvas(
+            self,
+            width=SHARED_WINDOW_DESIGN_WIDTH,
+            height=SHARED_WINDOW_DESIGN_HEIGHT,
+            highlightthickness=0,
+            bd=0,
+            bg=BROWSEGENRES_GRID_BG_COLOR,
+        )
+        self.canvas.pack(fill="both", expand=True)
+
+        # --- ttk ---
+        style = ttk.Style(self)
+        style.theme_use("clam")
+
+        # --- page state ---
+        self.current_page = ""
+        self.page_payload: dict[str, Any] = {}
+        self._side_menu_open = False
+
+        # ---------- SIDE MENU (pause-style overlay) ----------
+        self._side_menu_win: tk.Toplevel | None = None
+        self._side_menu_bg_lbl: tk.Label | None = None
+        self._side_menu_pil: Image.Image | None = None
+        self._side_menu_bg_tk: ImageTk.PhotoImage | None = None
+
+        self._menu_btn_lbl: tk.Label | None = None
+        self._menu_btn_pil: Image.Image | None = None
+        self._menu_btn_tk: ImageTk.PhotoImage | None = None
+        self._menu_btn_last_size: int | None = None
+        self._menu_btn_item: int | None = None
+
+        self._init_side_menu_assets()
+
+        self._load_background_image()
+        self._page_img_refs: list[ImageTk.PhotoImage] = []
+        self._sync_popup_open = False
+
+        self.bind_all("<MouseWheel>", self._on_global_mousewheel)
+        self.bind_all("<Button-4>", self._on_global_mousewheel)
+        self.bind_all("<Button-5>", self._on_global_mousewheel)
+
+        self.bind("<Configure>", self._handle_resize)
+
+        # --- data ---
+        self._build_collection_selected: list[str] = []
+        self.data = LibraryData(get_user_data_dir())
+
+        # Your UI continues to use a list of dicts
+        self.catalog = list(self.data.catalog.values())
+
+        self.last_search_results: list[dict] | None = None
+        self.last_search_query: str = ""
+
+        self.show_main_page()
+        self.update_idletasks()
+        self._update_background_image()
+        self._update_canvas_text_positions()
+        self._reposition_design_widgets()
+        self.after(50, lambda: (self.deiconify(), self.lift()))
+
     def _ensure_book_origin(self, book: dict) -> dict:
         """
         If we're already on Book Info and the current payload has an _origin,
@@ -637,24 +744,92 @@ class LibraryApp(tk.Tk):
             return b
         return book
 
+    def _is_windows(self) -> bool:
+        return platform.system().lower() == "windows"
 
+    def _broadcast_font_change_windows(self) -> None:
+        # HWND_BROADCAST = 0xFFFF, WM_FONTCHANGE = 0x001D
+        try:
+            ctypes.windll.user32.SendMessageTimeoutW(
+                0xFFFF, 0x001D, 0, 0,
+                0x0002, 1000, None
+            )
+        except Exception:
+            pass
 
-    def __init__(self):
-        def get_user_data_dir(app_name: str = "CozyLibraryManager") -> Path:
-            """
-            Returns a persistent per-user data directory.
-            Windows: %APPDATA%\\CozyLibraryManager
-            """
-            appdata = os.getenv("APPDATA")
-            if appdata:
-                p = Path(appdata) / app_name
-            else:
-                # fallback (mac/linux dev)
-                p = Path.home() / f".{app_name.lower()}"
-            p.mkdir(parents=True, exist_ok=True)
-            return p
+    def _add_private_font_windows(self, font_path: str) -> bool:
+        # AddFontResourceExW with FR_PRIVATE makes font available to this process only
+        FR_PRIVATE = 0x10
+        try:
+            add = ctypes.windll.gdi32.AddFontResourceExW
+            add.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.LPVOID]
+            added = add(font_path, FR_PRIVATE, None)
+            return added > 0
+        except Exception:
+            return False
 
-        super().__init__()
+    def _load_app_fonts(self) -> None:
+        """
+        Load fonts from ASSETS/fonts so they work on Windows even if not installed system-wide.
+        Safe to call multiple times.
+        """
+        if not self._is_windows():
+            return
+
+        fonts_dir = resource_path("ASSETS", "fonts")  # <-- resource_path returns a Path
+        if not fonts_dir.is_dir():
+            return
+
+        loaded_any = False
+        for fp in fonts_dir.iterdir():
+            if fp.suffix.lower() not in (".ttf", ".otf", ".ttc"):
+                continue
+            if self._add_private_font_windows(str(fp)):
+                loaded_any = True
+
+        if loaded_any:
+            self._broadcast_font_change_windows()
+
+    def _pick_font_family(self, primary: str, fallbacks: list[str]) -> str:
+        """
+        Return the first family name that Tk actually sees.
+        Keeps casing exactly as Tk reports it.
+        """
+        fams = tkfont.families(self)  # use this root
+        fam_map = {f.lower(): f for f in fams}
+
+        for name in [primary, *fallbacks]:
+            if name and name.lower() in fam_map:
+                return fam_map[name.lower()]
+
+        return primary
+
+    def _resolve_font_fallbacks(self) -> None:
+        global SHARED_FONT_CUSTOM, SHARED_FONT_BUTTON, SHARED_FONT_TABLE
+        global SHARED_TABLE_HEADER_FONT, SHARED_TABLE_ROW_FONT
+        global ENTRY_BAR_FONT_FAMILY
+
+        SHARED_FONT_TABLE = self._pick_font_family(
+            "Liberation Sans",
+            ["Cardo", "Cambria", "Segoe UI", "Arial"]
+        )
+        SHARED_FONT_BUTTON = self._pick_font_family(
+            "Sherly Kitchen",
+            ["Bebas Neue", "Garamond", "Segoe UI", "Arial"]
+        )
+        SHARED_FONT_CUSTOM = self._pick_font_family(
+            "AESTHICA",
+            ["Great Vibes", "Lucida Handwriting", "Segoe Script", "Times New Roman"]
+        )
+
+        SHARED_TABLE_HEADER_FONT = (SHARED_FONT_TABLE, 20, "bold")
+        SHARED_TABLE_ROW_FONT = (SHARED_FONT_TABLE, 16)
+        ENTRY_BAR_FONT_FAMILY = SHARED_FONT_TABLE
+
+        self._load_app_fonts()
+        self._resolve_font_fallbacks()
+
+        self._init_fonts()
 
         # prevent initial "flash" before first page is fully rendered
         self.withdraw()
@@ -672,7 +847,6 @@ class LibraryApp(tk.Tk):
         self._scroll_target: tk.Canvas | None = None
         self._resize_after_id: str | None = None
 
-        self._init_fonts()
         style = ttk.Style(self)
         style.theme_use("clam")
 
@@ -706,7 +880,6 @@ class LibraryApp(tk.Tk):
         self.bind_all("<MouseWheel>", self._on_global_mousewheel)
         self.bind_all("<Button-4>", self._on_global_mousewheel)
         self.bind_all("<Button-5>", self._on_global_mousewheel)
-        self.bind("<Configure>", self._on_resize)
         self.bind_all("<Escape>", self._escape_exit_fullscreen, add="+")
         self.bind("<Command-f>", lambda e: self.toggle_fullscreen())
 
@@ -2871,6 +3044,27 @@ class LibraryApp(tk.Tk):
 
     # ---------- FONTS ----------
     def _init_fonts(self):
+        import tkinter.font as tkfont
+
+        def pick(preferred, fallbacks):
+            fams = set(tkfont.families())
+            for name in [preferred, *fallbacks]:
+                if name in fams:
+                    return name
+            return fallbacks[-1] if fallbacks else "Segoe UI"
+
+        global SHARED_FONT_CUSTOM, SHARED_FONT_BUTTON, SHARED_FONT_TABLE
+        global SHARED_TABLE_HEADER_FONT, SHARED_TABLE_ROW_FONT
+        global ENTRY_BAR_FONT_FAMILY
+
+        SHARED_FONT_TABLE = pick("Liberation Sans", ["Cambria", "Segoe UI", "Calibri", "Arial"])
+        SHARED_FONT_CUSTOM = pick("AESTHICA", ["Lucida Handwriting", "Segoe Script", "Georgia"])
+        SHARED_FONT_BUTTON = pick("Sherly Kitchen", ["Garamond", "Georgia", "Cambria", "Times New Roman"])
+
+        ENTRY_BAR_FONT_FAMILY = SHARED_FONT_CUSTOM
+        SHARED_TABLE_HEADER_FONT = (SHARED_FONT_TABLE, 20, "bold")
+        SHARED_TABLE_ROW_FONT = (SHARED_FONT_TABLE, 18)
+
         self.title_font = tkfont.Font(
             family=SHARED_FONT_CUSTOM, size=82, weight="bold"
         )
@@ -8446,7 +8640,7 @@ class LibraryApp(tk.Tk):
         if BODY_FONT is None:
             try:
                 fams = set(tkfont.families())
-                BODY_FONT = "Liberation Sans" if "Liberation Sans" in fams else SHARED_FONT_CUSTOM
+                BODY_FONT = "liberation-sans" if "liberation-sans" in fams else SHARED_FONT_CUSTOM
             except Exception:
                 BODY_FONT = SHARED_FONT_CUSTOM
 
@@ -9270,7 +9464,7 @@ class LibraryApp(tk.Tk):
         # ---------- fonts ----------
         try:
             fams = set(tkfont.families())
-            BODY_FONT = "Liberation Sans" if "Liberation Sans" in fams else SHARED_FONT_CUSTOM
+            BODY_FONT = "liberation-sans" if "liberation-sans" in fams else SHARED_FONT_CUSTOM
         except Exception:
             BODY_FONT = SHARED_FONT_CUSTOM
 
