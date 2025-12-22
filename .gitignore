@@ -1,0 +1,22 @@
+# --- Python ---
+__pycache__/
+*.pyc
+
+# --- Virtualenv ---
+.venv/
+venv/
+pyvenv.cfg
+
+# --- macOS junk ---
+.DS_Store
+__MACOSX/
+
+# --- PyInstaller output ---
+build/
+dist/
+
+# --- IDE ---
+.idea/
+
+# --- App runtime data (DO NOT SHIP) ---
+library_data/
