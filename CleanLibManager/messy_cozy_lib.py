@@ -3000,9 +3000,9 @@ class LibraryApp(tk.Tk):
         global SHARED_TABLE_HEADER_FONT, SHARED_TABLE_ROW_FONT
         global ENTRY_BAR_FONT_FAMILY
 
-        SHARED_FONT_TABLE = pick("Liberation Sans", ["Cambria", "Segoe UI", "Calibri", "Arial"])
-        SHARED_FONT_CUSTOM = pick("AESTHICA", ["Lucida Handwriting", "Segoe Script", "Georgia"])
-        SHARED_FONT_BUTTON = pick("Sherly Kitchen", ["Garamond", "Georgia", "Cambria", "Times New Roman"])
+        SHARED_FONT_TABLE = pick("Liberation Sans", ["Cardo", "Cambria", "Segoe UI", "Arial"])
+        SHARED_FONT_CUSTOM = pick("AESTHICA", ["Great Vibes", "Bebas Neue", "Cardo", "Segoe UI"])
+        SHARED_FONT_BUTTON = pick("Sherly Kitchen", ["Bebas Neue", "Garamond", "Segoe UI", "Arial"])
 
         ENTRY_BAR_FONT_FAMILY = SHARED_FONT_CUSTOM
         SHARED_TABLE_HEADER_FONT = (SHARED_FONT_TABLE, 20, "bold")
