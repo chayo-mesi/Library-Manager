@@ -623,22 +623,24 @@ SYNCLIB_TEXT_COLOR                   = THEME_COLOR2
 
 def get_user_data_dir(app_name: str = "CozyLibraryManager") -> Path:
     """
-    Returns a persistent per-user data directory.
-    Windows: %APPDATA%\\CozyLibraryManager
-    macOS: ~/Library/Application Support/CozyLibraryManager
-    Linux: ~/.local/share/CozyLibraryManager (or $XDG_DATA_HOME)
+    PORTABLE mode:
+      - If running from a PyInstaller exe, store data next to the exe:
+          <exe folder> / CozyLibraryManager_Data
+      - If running from source, store data next to the .py file:
+          <project folder> / CozyLibraryManager_Data
+
+    This makes data disappear when the user deletes the app folder.
     """
-    sysname = platform.system().lower()
 
-    if sysname == "windows":
-        base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
-        path = Path(base) / app_name
-    elif sysname == "darwin":
-        path = Path.home() / "Library" / "Application Support" / app_name
+    # 1) Prefer a folder next to the executable/script (portable install)
+    if getattr(sys, "frozen", False):
+        # PyInstaller exe
+        base_dir = Path(sys.executable).resolve().parent
     else:
-        base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
-        path = Path(base) / app_name
+        # Running from source (.py)
+        base_dir = Path(__file__).resolve().parent
 
+    path = base_dir / f"{app_name}_Data"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
