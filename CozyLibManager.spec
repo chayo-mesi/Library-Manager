@@ -1,11 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_submodules
 
 a = Analysis(
-    ['messy_cozy_lib.py'],  # Same directory as this spec file
+    ['CleanLibManager/messy_cozy_lib.py'],  # Path from repo root
     pathex=[],
     binaries=[],
-    datas=[('ASSETS', 'ASSETS')],  # ASSETS is in same directory
+    datas=[('CleanLibManager/ASSETS', 'ASSETS')],  # Path from repo root
     hiddenimports=[
         'tkinter',
     ],
