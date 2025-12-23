@@ -644,88 +644,6 @@ def get_user_data_dir(app_name: str = "CozyLibraryManager") -> Path:
 
 class LibraryApp(tk.Tk):
 
-    def __init__(self) -> None:
-        super().__init__()
-
-        # prevent initial "flash" before first page is fully rendered
-        self.withdraw()
-
-        # Load bundled fonts (Windows) + resolve primary->fallback font families
-        self._load_app_fonts()
-        self._resolve_font_fallbacks()
-
-        # Build Tk Font objects using the resolved families
-        self._init_fonts()
-
-        self.title(SHARED_WINDOW_TITLE)
-        self.minsize(900, 600)
-        self.geometry("1280x920")
-
-        self.active_widgets: list[tk.Widget] = []
-        self.placed_widgets: list[tuple[tk.Widget, int, int, str]] = []
-        self.canvas_text_items: list[tuple[int, float, float]] = []
-
-        # --- canvas ---
-        self.canvas = tk.Canvas(
-            self,
-            width=SHARED_WINDOW_DESIGN_WIDTH,
-            height=SHARED_WINDOW_DESIGN_HEIGHT,
-            highlightthickness=0,
-            bd=0,
-            bg=BROWSEGENRES_GRID_BG_COLOR,
-        )
-        self.canvas.pack(fill="both", expand=True)
-
-        # --- ttk ---
-        style = ttk.Style(self)
-        style.theme_use("clam")
-
-        # --- page state ---
-        self.current_page = ""
-        self.page_payload: dict[str, Any] = {}
-        self._side_menu_open = False
-
-        # ---------- SIDE MENU (pause-style overlay) ----------
-        self._side_menu_win: tk.Toplevel | None = None
-        self._side_menu_bg_lbl: tk.Label | None = None
-        self._side_menu_pil: Image.Image | None = None
-        self._side_menu_bg_tk: ImageTk.PhotoImage | None = None
-
-        self._menu_btn_lbl: tk.Label | None = None
-        self._menu_btn_pil: Image.Image | None = None
-        self._menu_btn_tk: ImageTk.PhotoImage | None = None
-        self._menu_btn_last_size: int | None = None
-        self._menu_btn_item: int | None = None
-
-        self._init_side_menu_assets()
-
-        self._load_background_image()
-        self._page_img_refs: list[ImageTk.PhotoImage] = []
-        self._sync_popup_open = False
-
-        self.bind_all("<MouseWheel>", self._on_global_mousewheel)
-        self.bind_all("<Button-4>", self._on_global_mousewheel)
-        self.bind_all("<Button-5>", self._on_global_mousewheel)
-
-        self.bind("<Configure>", self._handle_resize)
-
-        # --- data ---
-        self._build_collection_selected: list[str] = []
-        self.data = LibraryData(get_user_data_dir())
-
-        # Your UI continues to use a list of dicts
-        self.catalog = list(self.data.catalog.values())
-
-        self.last_search_results: list[dict] | None = None
-        self.last_search_query: str = ""
-
-        self.show_main_page()
-        self.update_idletasks()
-        self._update_background_image()
-        self._update_canvas_text_positions()
-        self._reposition_design_widgets()
-        self.after(50, lambda: (self.deiconify(), self.lift()))
-
     def _ensure_book_origin(self, book: dict) -> dict:
         """
         If we're already on Book Info and the current payload has an _origin,
@@ -826,13 +744,18 @@ class LibraryApp(tk.Tk):
         SHARED_TABLE_ROW_FONT = (SHARED_FONT_TABLE, 16)
         ENTRY_BAR_FONT_FAMILY = SHARED_FONT_TABLE
 
-        self._load_app_fonts()
-        self._resolve_font_fallbacks()
-
-        self._init_fonts()
+    def __init__(self) -> None:
+        super().__init__()
 
         # prevent initial "flash" before first page is fully rendered
         self.withdraw()
+
+        # Load bundled fonts (Windows) + resolve primary->fallback font families
+        self._load_app_fonts()
+        self._resolve_font_fallbacks()
+
+        # Build Tk Font objects using the resolved families
+        self._init_fonts()
 
         self.title(SHARED_WINDOW_TITLE)
         self.minsize(900, 600)
@@ -842,6 +765,18 @@ class LibraryApp(tk.Tk):
         self.placed_widgets: list[tuple[tk.Widget, int, int, str]] = []
         self.canvas_text_items: list[tuple[int, float, float]] = []
 
+        # --- canvas ---
+        self.canvas = tk.Canvas(
+            self,
+            width=SHARED_WINDOW_DESIGN_WIDTH,
+            height=SHARED_WINDOW_DESIGN_HEIGHT,
+            highlightthickness=0,
+            bd=0,
+            bg=BROWSEGENRES_GRID_BG_COLOR,
+        )
+        self.canvas.pack(fill="both", expand=True)
+        self.page_payload: dict[str, Any] = {}
+
         self._bg_pil: Image.Image | None = None
         self._bg_tk: ImageTk.PhotoImage | None = None
         self._scroll_target: tk.Canvas | None = None
@@ -850,10 +785,9 @@ class LibraryApp(tk.Tk):
         style = ttk.Style(self)
         style.theme_use("clam")
 
-        self.canvas = tk.Canvas(self, highlightthickness=0, bd=0)
-        self.canvas.pack(fill="both", expand=True)
-
         # ---------- SIDE MENU (pause-style overlay) ----------
+        self._side_menu_win: tk.Toplevel | None = None
+        self._side_menu_pil: Image.Image | None = None
         self.canvas.bind("<Configure>", self._on_canvas_configure)
         self._side_menu_open = False
         self._side_menu_frame: tk.Frame | None = None
@@ -863,7 +797,6 @@ class LibraryApp(tk.Tk):
         self._side_menu_bg_last_size: tuple[int, int] | None = None
         self._side_menu_dim: tk.Toplevel | None = None
         self._side_menu_panel_win: tk.Toplevel | None = None
-        self._side_menu_bg_lbl: tk.Label | None = None
 
         self._menu_btn_lbl: tk.Label | None = None
         self._menu_btn_pil: Image.Image | None = None
@@ -885,7 +818,6 @@ class LibraryApp(tk.Tk):
 
         self._page_rebuild_after_id = None
         self.current_page: str = "main"
-        self.page_payload: dict = {}
         self._nav_history: list[tuple[str, dict]] = []
         self._nav_suppress_record = False
 
