@@ -57,7 +57,7 @@ OPEN_COLLECTION_BG_IMG = ASSETS_DIR / "open collection.png"
 THEME_COLOR00   = "#000000"   # Black
 THEME_COLOR1    = "#003B32"   # Primary dark green
 THEME_COLOR2    = "#FFFFFF"   # White / light background
-THEME_COLOR3    = "#F4E6D3"   # Warm cream / highlight
+THEME_COLOR3    = "#f0eae9"   # Warm cream / highlight
 THEME_COLOR4    = "#E0D9D7"   # Soft gray / secondary surface
 THEME_COLOR5    = "#111111"   # Near black / primary text
 THEME_COLOR6    = "#666666"   # Medium gray / muted text
@@ -1536,15 +1536,15 @@ class LibraryApp(tk.Tk):
         self.make_canvas_text(
             "Missing Data Review",
             0.5,
-            0.16,
+            0.1,
             title_font,
         )
 
         subtitle_font = tkfont.Font(family=SHARED_FONT_TABLE, size=18, weight="bold")
         self.make_canvas_text(
-            "Add missing info below, then click SAVE (bottom-left).",
+            "Add missing info below, then click SAVE.",
             0.5,
-            0.22,
+            0.9,
             subtitle_font,
         )
 
@@ -1669,7 +1669,7 @@ class LibraryApp(tk.Tk):
 
         container, canvas, scroll_frame = self._make_scroll_container(
             bg=SHARED_SCROLL_BG_COLOR,
-            relwidth=0.88,
+            relwidth=0.8,
             relheight=0.68,
             top_inset=70,
             sb_width=14,
@@ -1678,7 +1678,7 @@ class LibraryApp(tk.Tk):
         )
 
         # Pinned header row
-        header = tk.Frame(container, bg=SHARED_MAINHEADER2_BG_COLOR, height=70, highlightthickness=0, bd=0)
+        header = tk.Frame(container, bg=SHARED_MAINHEADER_BG_COLOR, height=70, highlightthickness=0, bd=0)
         header.place(x=0, y=0, relwidth=1.0, height=70)
         header.pack_propagate(False)
         self.active_widgets.append(header)
@@ -1707,8 +1707,8 @@ class LibraryApp(tk.Tk):
             tk.Label(
                 header,
                 text=label,
-                bg=SHARED_MAINHEADER2_BG_COLOR,
-                fg=SHARED_MAINHEADER2_TEXT_COLOR,
+                bg=SHARED_MAINHEADER_BG_COLOR,
+                fg=SHARED_MAINHEADER_SUBTEXT_COLOR,
                 font=(SHARED_FONT_TABLE, 18, "bold"),
                 anchor="w",
             ).grid(row=0, column=ci, sticky="w", padx=(12 if ci == 0 else 8), pady=18)
@@ -1849,7 +1849,7 @@ class LibraryApp(tk.Tk):
                         text="+",
                         command=lambda _bid=bid: self._missing_review_upload_cover(_bid),
                         font=(SHARED_FONT_TABLE, 18, "bold"),
-                        bg=MISSINGDATA_PLUSUPLOAD_BG,
+                        bg=SHARED_MAINHEADER_BG_COLOR,
                         fg=MISSINGDATA_PLUSUPLOAD_TEXT_COLOR,
                         activebackground=MISSINGDATA_PLUSUPLOAD_BG_ONCLICK_COLOR,
                         activeforeground=MISSINGDATA_PLUSUPLOAD_TEXT_ONCLICK_COLOR,
@@ -7221,7 +7221,7 @@ class LibraryApp(tk.Tk):
 
         # --- title ---
         title_font = tkfont.Font(family=SHARED_FONT_CUSTOM, size=80, weight="bold")
-        self.make_canvas_text("            Build \n Collection", 0.25, 0.3,title_font)
+        self.make_canvas_text("            Build \n     Collection", 0.2, 0.3,title_font)
 
         # --- nav (keeps your home/back/hamburger behavior) ---
         self.mount_left_nav()
@@ -8461,7 +8461,7 @@ class LibraryApp(tk.Tk):
         tags_label = tk.Label(
             tags_frame,
             text="TAGS:",
-            font=label_font,
+            font=tkfont.Font(family=SHARED_FONT_CUSTOM, size=14),
             bg=BOOKDETAIL_TAGDISPLAY_HOLDER_BG_COLOR,
             fg=BOOKDETAIL_TAGDISPLAY_LABEL_TEXT_COLOR,
         )
@@ -8608,7 +8608,7 @@ class LibraryApp(tk.Tk):
         pad_x = 20
         card_left = CARD_X - (CARD_W // 2)
         TAGS_X = card_left + pad_x
-        TAGS_Y = 650
+        TAGS_Y = 700
 
         tags_label_font = (BODY_FONT, S(16), "bold")
         tags_font = (BODY_FONT, S(13))
@@ -9106,7 +9106,7 @@ class LibraryApp(tk.Tk):
                 text="TAGS:",
                 bg=BOOKDETAIL_TAGSELECT_HOLDER_BG_COLOR,
                 fg=BOOKDETAIL_TAGHOLDER_SUBTEXT_COLOR,
-                font=lbl_font
+                font=tkfont.Font(family=SHARED_FONT_CUSTOM, size=14)
             ).pack(side="left", padx=(0, 10))
 
             # toggle + / ✕
@@ -9709,7 +9709,7 @@ class LibraryApp(tk.Tk):
             title_lbl = tk.Label(
                 card, text=title,
                 bg=BOOKDETAIL_CARD_BG_COLOR, fg=BOOKDETAIL_CARD_TEXT_COLOR,
-                font=(BODY_FONT, T(28), "bold"),
+                font=(BODY_FONT, T(22), "bold"),
                 wraplength=CARD_W - 2 * pad_x,
                 anchor="w", justify="left"
             )
@@ -9755,7 +9755,7 @@ class LibraryApp(tk.Tk):
             author_lbl = tk.Label(
                 card, text=author,
                 bg=BOOKDETAIL_CARD_BG_COLOR, fg=BOOKDETAIL_CARD_TEXT_COLOR,
-                font=(BODY_FONT, T(22), "italic"),
+                font=(BODY_FONT, T(18), "italic"),
                 anchor="w", justify="left"
             )
             author_lbl.place(x=pad_x, y=author_y, anchor="nw")
@@ -9904,7 +9904,7 @@ class LibraryApp(tk.Tk):
             wrap="word",
             bg=BOOKDETAIL_CARD_BG_COLOR,
             fg=BOOKDETAIL_CARD_TEXT_COLOR,
-            font=(BODY_FONT, T(18 if fs else 16)),
+            font=(BODY_FONT, T(16 if fs else 14)),
             bd=0,
             highlightthickness=(1 if getattr(self, "_book_edit_mode", False) else 0),
             highlightbackground=("black" if getattr(self, "_book_edit_mode", False) else BOOKDETAIL_CARD_BG_COLOR),
