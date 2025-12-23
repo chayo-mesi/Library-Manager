@@ -1,26 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Updated PyInstaller spec file for CozyLibraryManager
-#
-# This assumes the following directory structure:
-# repo/
-# ├── messy_cozy_lib.py
-# ├── library_data.py
-# ├── requirements.txt
-# ├── CozyLibManager.spec (this file)
-# └── ASSETS/
-#     ├── fonts/
-#     ├── *.png images
-#     └── ...
-
 from PyInstaller.utils.hooks import collect_submodules
 
 a = Analysis(
-    ['messy_cozy_lib.py'],  # Entry point - assumes same directory as this spec
+    ['messy_cozy_lib.py'],  # Same directory as this spec file
     pathex=[],
     binaries=[],
-    datas=[('ASSETS', 'ASSETS')],  # Bundle ASSETS folder
+    datas=[('ASSETS', 'ASSETS')],  # ASSETS is in same directory
     hiddenimports=[
-        'tkinter',  # Explicitly include tkinter for some PyInstaller versions
+        'tkinter',
     ],
     hookspath=[],
     hooksconfig={},
@@ -41,8 +28,8 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,  # Include binaries in exe (onedir mode)
-    a.datas,     # Include data files
+    a.binaries,
+    a.datas,
     [],
     name='CozyLibraryManager',
     debug=False,
@@ -51,13 +38,13 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # No console window for GUI app
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # Set to 'ASSETS/icon.ico' if you have one
+    icon=None,
 )
 
 coll = COLLECT(

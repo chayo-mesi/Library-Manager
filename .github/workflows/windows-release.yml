@@ -14,10 +14,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v4
         with:
           python-version: "3.13"
           cache: "pip"
@@ -25,20 +25,20 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r CleanLibManager/requirements.txt
 
       - name: Build with PyInstaller (spec)
         run: |
+          cd CleanLibManager
           pyinstaller --noconfirm --clean CozyLibManager.spec
 
       - name: Zip the app folder
         shell: pwsh
         run: |
-          $d = Get-ChildItem -Path dist -Directory | Select-Object -First 1
-          if (-not $d) { throw "No dist subfolder found in dist/." }
+          $d = Get-ChildItem -Path CleanLibManager/dist -Directory | Select-Object -First 1
+          if (-not $d) { throw "No dist subfolder found in CleanLibManager/dist/." }
           Write-Host "Zipping folder: $($d.FullName)"
           Compress-Archive -Force -Path (Join-Path $d.FullName '*') -DestinationPath CozyLibManager-windows.zip
-      
 
       - name: Create GitHub Release and upload zip
         uses: softprops/action-gh-release@v2
