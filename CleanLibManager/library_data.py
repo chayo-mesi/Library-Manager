@@ -431,6 +431,21 @@ class LibraryData:
         _safe_write_json(self.catalog_path, self.catalog)
         _safe_write_json(self.cover_index_path, self.cover_index)
         _safe_write_json(self.collections_path, self.collections)
+
+        # Persist user customizations too (so they survive restarts)
+        try:
+            _safe_write_json(self.user_genres_path, sorted(getattr(self, "user_genres", set()), key=str.lower))
+        except Exception:
+            pass
+        try:
+            _safe_write_json(self.genre_overrides_path, getattr(self, "genre_overrides", {}))
+        except Exception:
+            pass
+        try:
+            _safe_write_json(self.deleted_genres_path, sorted(getattr(self, "deleted_genres", set()), key=str.lower))
+        except Exception:
+            pass
+
         self._invalidate_search_cache()
 
     def factory_reset(self) -> None:

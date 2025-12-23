@@ -252,8 +252,8 @@ SHARED_WINDOW_TITLE                  = "Library Manager"
 MAINMENU_LABEL_FG_COLOR              = THEME_COLOR5
 
 # 2. Sizes
-MAINMENU_TITLE_FONT_SIZE             = 102
-MAINMENU_SUBTITLE_FONT_SIZE          = 32
+MAINMENU_TITLE_FONT_SIZE             = 82
+MAINMENU_SUBTITLE_FONT_SIZE          = 28
 MAINMENU_BUTTON_FONT_SIZE            = 28
 MAINMENU_SMALL_BUTTON_FONT_SIZE      = 22
 
@@ -527,7 +527,7 @@ BOOKDETAIL_GAP_AFTER_TITLE           = 10
 BOOKDETAIL_GAP_AFTER_AUTHOR          = 14
 
 # 2. Sizes - Genre Header
-BOOKDETAIL_GENRE_FONT_SIZE           = 52
+BOOKDETAIL_GENRE_FONT_SIZE           = 48
 BOOKDETAIL_GENRE_OFFSET_Y            = 55
 
 # 2. Sizes - Edit Mode Buttons
@@ -737,7 +737,7 @@ class LibraryApp(tk.Tk):
         )
         SHARED_FONT_CUSTOM = self._pick_font_family(
             "AESTHICA",
-            ["Great Vibes", "Lucida Handwriting", "Segoe Script", "Times New Roman"]
+            ["Great Vibes", "Bebas Neue", "Cardo", "Segoe UI"]
         )
 
         SHARED_TABLE_HEADER_FONT = (SHARED_FONT_TABLE, 20, "bold")
@@ -1178,6 +1178,13 @@ class LibraryApp(tk.Tk):
         except Exception:
             existing_files = set()
 
+        # Snapshot cover_index so Cancel can fully revert (prevents stale index entries)
+        try:
+            existing_cover_index = dict(getattr(self.data, "cover_index", {}) or {})
+        except Exception:
+            existing_cover_index = {}
+
+
         def start_sorting_animation():
             phase["mode"] = "sorting"
             bar.config(mode="indeterminate")
@@ -1417,8 +1424,10 @@ class LibraryApp(tk.Tk):
                     except Exception:
                         pass
 
+                    # Revert any in-memory/disk cover_index changes from this run
                     try:
-                        self.data = LibraryData(BASE_DIR / "library_data")
+                        self.data.cover_index = dict(existing_cover_index)
+                        self.data.save()  # writes cover_index.json back to the same data_dir
                         self._refresh_catalog_from_data()
                     except Exception:
                         pass
@@ -4535,9 +4544,9 @@ class LibraryApp(tk.Tk):
             font=(SHARED_FONT_TABLE, 16),
             bg=bg,
             fg=SHARED_RADIO_TEXT_COLOR,
-            selectcolor=SHARED_RADIO_HIGHLIGHT_COLOR,
+            selectcolor=SHARED_MAINHEADER_BG_COLOR,
             activebackground=bg,
-            activeforeground=SHARED_RADIO_HIGHLIGHT_COLOR,
+            activeforeground=SHARED_ALPHA_MUTED_TEXT_COLOR,
             bd=1,
             relief="solid",
             padx=10,
@@ -7252,7 +7261,7 @@ class LibraryApp(tk.Tk):
         name_var = tk.StringVar(value=(prefill_name or self._next_collection_name()))
         search_var = tk.StringVar(value="")
 
-        label_font = tkfont.Font(family=SHARED_FONT_TABLE, size=18, weight="bold")
+        label_font = tkfont.Font(family=SHARED_FONT_TABLE, size=14, weight="bold")
         row_font = tkfont.Font(family=SHARED_FONT_TABLE, size=14)
         plus_font = tkfont.Font(family=SHARED_FONT_TABLE, size=20, weight="bold")
 
@@ -7811,33 +7820,48 @@ class LibraryApp(tk.Tk):
     def _available_genres_for_tab(self, tab: str) -> list[str]:
         """
         Returns genres that currently exist in the library for the selected tab.
-        - fiction: Only fiction genres with books
-        - nonfiction: Only nonfiction genres with books
-        - all: All standard genres (fiction + nonfiction) with books
-        - custom: Only custom user genres with books
+        - fiction: Only fiction starter genres with books
+        - nonfiction: Only nonfiction starter genres with books
+        - all: ALL genres present in the library (starter + custom + any legacy) with books
+        - custom: Only custom (non-starter) genres with books
         """
-        found = {(b.get("genre") or "").strip().title() for b in self.catalog}
+        found = {(b.get("genre") or "").strip().title() for b in (self.catalog or [])}
+        found.discard("")  # remove empty
+
+        starter = {
+            g.strip().title()
+            for g in (
+                    getattr(self.data, "FICTION_GENRES", [])
+                    + getattr(self.data, "NONFICTION_GENRES", [])
+            )
+        }
 
         if tab == "fiction":
-            allowed = self.data.FICTION_GENRES
-            return [g for g in allowed if g.title() in found]
-        elif tab == "nonfiction":
-            allowed = self.data.NONFICTION_GENRES
-            return [g for g in allowed if g.title() in found]
-        elif tab == "all":
-            # All standard genres (fiction + nonfiction)
-            fiction = [g for g in self.data.FICTION_GENRES if g.title() in found]
-            nonfiction = [g for g in self.data.NONFICTION_GENRES if g.title() in found]
-            # Combine and sort alphabetically
-            return sorted(set(fiction + nonfiction), key=str.lower)
-        elif tab == "custom":
-            # Only custom user genres
-            user_genres = self.data.get_user_genres() if hasattr(self.data, 'get_user_genres') else []
-            return [g for g in user_genres if g.title() in found]
-        else:
-            # Default to fiction
-            allowed = self.data.FICTION_GENRES
-            return [g for g in allowed if g.title() in found]
+            allowed = [g.strip().title() for g in getattr(self.data, "FICTION_GENRES", [])]
+            return [g for g in allowed if g in found]
+
+        if tab == "nonfiction":
+            allowed = [g.strip().title() for g in getattr(self.data, "NONFICTION_GENRES", [])]
+            return [g for g in allowed if g in found]
+
+        if tab == "all":
+            # ✅ truly "all": includes custom genres
+            return sorted(found, key=str.lower)
+
+        if tab == "custom":
+            # Custom = genres used by books that are NOT starter genres
+            try:
+                user_genres = {g.strip().title() for g in self.data.get_user_genres()}
+            except Exception:
+                user_genres = set()
+
+            custom_in_books = {g for g in found if g not in starter}
+            custom_in_books |= {g for g in user_genres if g in found}
+            return sorted(custom_in_books, key=str.lower)
+
+        allowed = [g.strip().title() for g in getattr(self.data, "FICTION_GENRES", [])]
+        return [g for g in allowed if g in found]
+
     def show_browse_genres_page(self, selected_tab="all"):
         self.set_page("browse_genres", tab=selected_tab)
 
@@ -9330,7 +9354,7 @@ class LibraryApp(tk.Tk):
                 top_row,
                 text="Search",
                 command=lambda: self.perform_search(search_entry.get()),
-                font=tkfont.Font(family=SHARED_FONT_CUSTOM, size=22),
+                font=tkfont.Font(family=SHARED_FONT_CUSTOM, size=20),
                 bg=SHARED_BUTTON1_BG_COLOR,
                 fg=SHARED_BUTTON1_TEXT_COLOR,
                 activebackground=SHARED_BUTTON1_BG_ONCLICK_COLOR,
@@ -9568,7 +9592,7 @@ class LibraryApp(tk.Tk):
                 text=f"ISBN: {isbn}",
                 bg=BOOKDETAIL_ISBN_BG_COLOR,
                 fg=BOOKDETAIL_ISBN_TEXT_COLOR,
-                font=(BODY_FONT, S(15)),
+                font=(BODY_FONT, S(12)),
                 bd=0,
                 highlightthickness=0
             )
@@ -9683,7 +9707,7 @@ class LibraryApp(tk.Tk):
             title_lbl = tk.Label(
                 card, text=title,
                 bg=BOOKDETAIL_CARD_BG_COLOR, fg=BOOKDETAIL_CARD_TEXT_COLOR,
-                font=(BODY_FONT, T(30), "bold"),
+                font=(BODY_FONT, T(28), "bold"),
                 wraplength=CARD_W - 2 * pad_x,
                 anchor="w", justify="left"
             )
@@ -9794,7 +9818,7 @@ class LibraryApp(tk.Tk):
                 text="Genre:",
                 bg=BOOKEDIT_DESC_BG_COLOR,
                 fg=BOOKEDIT_DESC_TEXT_COLOR,
-                font=(BODY_FONT, S(18)),
+                font=(BODY_FONT, S(14)),
                 anchor="w",
             )
             genre_label.place(x=pad_x, y=genre_y, anchor="nw")
@@ -9878,7 +9902,7 @@ class LibraryApp(tk.Tk):
             wrap="word",
             bg=BOOKDETAIL_CARD_BG_COLOR,
             fg=BOOKDETAIL_CARD_TEXT_COLOR,
-            font=(BODY_FONT, T(20 if fs else 18)),
+            font=(BODY_FONT, T(18 if fs else 16)),
             bd=0,
             highlightthickness=(1 if getattr(self, "_book_edit_mode", False) else 0),
             highlightbackground=("black" if getattr(self, "_book_edit_mode", False) else BOOKDETAIL_CARD_BG_COLOR),
@@ -9927,7 +9951,7 @@ class LibraryApp(tk.Tk):
                 activeforeground=SHARED_BUTTON1_TEXT_ONCLICK_COLOR,
                 bd=0,
                 highlightthickness=0,
-                font=(SHARED_FONT_BUTTON, T(18)),
+                font=(SHARED_FONT_BUTTON, T(20)),
                 cursor="hand2",
             )
             self.place_design(cancel_btn, cancel_x, btn_y, anchor="nw")
@@ -9945,7 +9969,7 @@ class LibraryApp(tk.Tk):
                 activeforeground=SHARED_BUTTON1_TEXT_ONCLICK_COLOR,
                 bd=0,
                 highlightthickness=0,
-                font=(SHARED_FONT_BUTTON, T(18)),
+                font=(SHARED_FONT_BUTTON, T(20)),
                 cursor="hand2",
             )
             self.place_design(save_btn, save_x, btn_y, anchor="nw")
@@ -10062,11 +10086,9 @@ class LibraryApp(tk.Tk):
         genre_font = getattr(self, "_book_detail_genre_font", None)
         if genre_font:
             try:
-                genre_font.configure(size=S(52))
+                genre_font.configure(size=S(42))
             except Exception:
                 pass
-
-
 
         # 6) update tags frame placement
         if tags_frame and tags_frame.winfo_exists():
